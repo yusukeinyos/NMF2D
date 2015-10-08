@@ -17,6 +17,7 @@ namespace NMF2D
         static List<double[,]> T = new List<double[,]>();
         static List<double[,]> V = new List<double[,]>();
         static double[,] Xhat;
+        static double[,] XdiviXhat;
         static double[,] ones;
 
 
@@ -32,18 +33,19 @@ namespace NMF2D
         {
             init();
             int itteration = 0;
-            while (itteration < 10)
+            while (itteration < 9)
             {
                 itteration++;
                 Updates();
-                Console.WriteLine("itteration : " + itteration);
+                Console.WriteLine("itteration : " + itteration + " error = " + errorcalc(X, Xhat));
+
             }
             CsvFileIO.CsvFileIO.WriteData("out_K.csv", T[0]);
         }
         //----------------------------------------------------------------------------
         static void init()
         {
-            string input_filename=@"C:\Users\優\Desktop\音素材\cq.csv";
+            string input_filename = @"C:\Users\優\Desktop\音素材\cq.csv";
             X = CsvFileIO.CsvFileIO.ReadData(input_filename);
 
             I = X.GetLength(0);
@@ -52,6 +54,10 @@ namespace NMF2D
             tau = 7;
             fai = 12;
             //T.Clear();
+            for (int i = 0; i < I; i++)
+                for (int j = 0; j < J; j++)
+                    X[i, j] = -X[i, j];
+                    XdiviXhat = new double[I, J];
 
             //T,Vの初期化
             for (int tt = 0; tt < tau; tt++)
@@ -71,9 +77,9 @@ namespace NMF2D
         static void Updates()
         {
             updateXhat();
-            updateV();
-            updateXhat();
             updateT();
+            updateXhat();
+            updateV();
         }
 
         //----------------------------------------------------------------------------
@@ -81,7 +87,7 @@ namespace NMF2D
         {
             double[,] A = new double[I, K];
             double[,] B = new double[I, K];
-            double[,] XdiviXhat = new double[I, J];
+
 
             for (int i = 0; i < I; i++)
                 for (int j = 0; j < J; j++)
@@ -90,6 +96,8 @@ namespace NMF2D
 
             for (int tt = 0; tt < tau; tt++)
             {
+                A.Clear();
+                B.Clear();
                 for (int ff = 0; ff < fai; ff++)
                 {
                     A = Mt.Add(A, Mt.Mul(shift_up(XdiviXhat, ff), shift_right(V[ff], tt).T()));
@@ -110,7 +118,6 @@ namespace NMF2D
         {
             double[,] A = new double[K, J];
             double[,] B = new double[K, J];
-            double[,] XdiviXhat = new double[I, J];
 
             for (int i = 0; i < I; i++)
                 for (int j = 0; j < J; j++)
@@ -119,10 +126,12 @@ namespace NMF2D
 
             for (int ff = 0; ff < fai; ff++)
             {
+                A.Clear();
+                B.Clear();
                 for (int tt = 0; tt < tau; tt++)
                 {
-                    A = Mt.Add(A,Mt.Mul(shift_down(T[tt], ff).T(), shift_left(XdiviXhat, tt)));
-                    B = Mt.Add(B,Mt.Mul(shift_down(T[tt], ff).T(), ones));
+                    A = Mt.Add(A, Mt.Mul(shift_down(T[tt], ff).T(), shift_left(XdiviXhat, tt)));
+                    B = Mt.Add(B, Mt.Mul(shift_down(T[tt], ff).T(), ones));
                 }
                 for (int k = 0; k < K; k++)
                     for (int j = 0; j < J; j++)
@@ -234,6 +243,22 @@ namespace NMF2D
             return matrix;
         }
         //----------------------------------------------------------------------------------------
+        static double errorcalc(double[,] truth, double[,] estimate)
+        {
+            int I = truth.GetLength(0);
+            int J = truth.GetLength(1);
+            double error = 0;
+            for (int i = 0; i < I; i++)
+            {
+                for (int j = 0; j < J; j++)
+                {
+                    error += Math.Sqrt((truth[i, j] - estimate[i, j]) * (truth[i, j] - estimate[i, j]));
+                }
+            }
+            return error / (I * J);
+        }
+        //----------------------------------------------------------------------------------------
+
         #endregion
     }
 }
