@@ -53,11 +53,8 @@ namespace NMF2D
             K = 3;
             tau = 7;
             fai = 12;
-            //T.Clear();
-            for (int i = 0; i < I; i++)
-                for (int j = 0; j < J; j++)
-                    X[i, j] = -X[i, j];
-                    XdiviXhat = new double[I, J];
+            
+            XdiviXhat = new double[I, J];
 
             //T,Vの初期化
             for (int tt = 0; tt < tau; tt++)
