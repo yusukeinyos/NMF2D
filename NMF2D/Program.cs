@@ -31,19 +31,23 @@ namespace NMF2D
 
         static void Main(string[] args)
         {
-            init();
+            int divergence_flag = 0;           // 0:Euclid Norm  1:KL 
+            int shift_flag = 0;                // 0:only f shift  1:f and time shift
+
+            init(shift_flag);
             int itteration = 0;
             while (itteration < 9)
             {
                 itteration++;
-                Updates();
+                Updates(divergence_flag);
                 Console.WriteLine("itteration : " + itteration + " error = " + errorcalc(X, Xhat));
 
             }
-            CsvFileIO.CsvFileIO.WriteData("out_K.csv", T[0]);
+            //CsvFileIO.CsvFileIO.WriteData("out_K.csv", T[0]);
+            CsvFileIO.CsvFileIO.WriteData("reproducted.csv", reproduct(0));
         }
         //----------------------------------------------------------------------------
-        static void init()
+        static void init(int shift_flag)
         {
             string input_filename = @"C:\Users\優\Desktop\音素材\cq.csv";
             X = CsvFileIO.CsvFileIO.ReadData(input_filename);
@@ -53,12 +57,25 @@ namespace NMF2D
             K = 3;
             tau = 7;
             fai = 12;
-            
+
             XdiviXhat = new double[I, J];
 
             //T,Vの初期化
-            for (int tt = 0; tt < tau; tt++)
-                T.Add(initMatrix(I, K));
+            switch (shift_flag)
+            {
+                // only f shift
+                case 0:
+                    tau = 1;
+                    T.Add(initMatrix(I, K));
+                    break;
+                // f and time shift
+                case 1:
+                    for (int tt = 0; tt < tau; tt++)
+                        T.Add(initMatrix(I, K));
+                    break;
+
+            }
+
             for (int ff = 0; ff < fai; ff++)
                 V.Add(initMatrix(K, J));
 
@@ -71,74 +88,126 @@ namespace NMF2D
 
         }
         //----------------------------------------------------------------------------
-        static void Updates()
+        static void Updates(int divergence_flag)
         {
             updateXhat();
-            updateT();
+            updateT(divergence_flag);
             updateXhat();
-            updateV();
+            updateV(divergence_flag);
         }
 
         //----------------------------------------------------------------------------
-        static void updateT()
+        static void updateT(int divergence_flag)
         {
             double[,] A = new double[I, K];
             double[,] B = new double[I, K];
 
-
-            for (int i = 0; i < I; i++)
-                for (int j = 0; j < J; j++)
-                    if (Xhat[i, j] != 0)
-                        XdiviXhat[i, j] = X[i, j] / Xhat[i, j];
-
-            for (int tt = 0; tt < tau; tt++)
+            //Euclid
+            if (divergence_flag == 0)
             {
-                A.Clear();
-                B.Clear();
-                for (int ff = 0; ff < fai; ff++)
+                for (int tt = 0; tt < tau; tt++)
                 {
-                    A = Mt.Add(A, Mt.Mul(shift_up(XdiviXhat, ff), shift_right(V[ff], tt).T()));
-                    B = Mt.Add(B, Mt.Mul(ones, shift_right(V[ff], tt).T()));
-                }
-                for (int i = 0; i < I; i++)
-                    for (int k = 0; k < K; k++)
+                    A.Clear();
+                    B.Clear();
+                    for (int ff = 0; ff < fai; ff++)
                     {
-                        if (A[i, k] == 0 && B[i, k] == 0)
-                            T[tt][i, k] = T[tt][i, k];
-                        else if (B[i, k] != 0)
-                            T[tt][i, k] = T[tt][i, k] * A[i, k] / B[i, k];
+                        A = Mt.Add(A, Mt.Mul(shift_up(X, ff), shift_right(V[ff], tt).T()));
+                        B = Mt.Add(B, Mt.Mul(shift_up(Xhat, ff), shift_right(V[ff], tt).T()));
                     }
+                    for (int i = 0; i < I; i++)
+                        for (int k = 0; k < K; k++)
+                        {
+                            if (A[i, k] == 0 && B[i, k] == 0)
+                                T[tt][i, k] = T[tt][i, k];
+                            else if (B[i, k] != 0)
+                                T[tt][i, k] = T[tt][i, k] * A[i, k] / B[i, k];
+                        }
+                }
             }
+
+            //KL
+            else if (divergence_flag == 1)
+            {
+                for (int i = 0; i < I; i++)
+                    for (int j = 0; j < J; j++)
+                        if (Xhat[i, j] != 0)
+                            XdiviXhat[i, j] = X[i, j] / Xhat[i, j];
+                for (int tt = 0; tt < tau; tt++)
+                {
+                    A.Clear();
+                    B.Clear();
+                    for (int ff = 0; ff < fai; ff++)
+                    {
+                        A = Mt.Add(A, Mt.Mul(shift_up(XdiviXhat, ff), shift_right(V[ff], tt).T()));
+                        B = Mt.Add(B, Mt.Mul(ones, shift_right(V[ff], tt).T()));
+                    }
+                    for (int i = 0; i < I; i++)
+                        for (int k = 0; k < K; k++)
+                        {
+                            if (A[i, k] == 0 && B[i, k] == 0)
+                                T[tt][i, k] = T[tt][i, k];
+                            else if (B[i, k] != 0)
+                                T[tt][i, k] = T[tt][i, k] * A[i, k] / B[i, k];
+                        }
+                }
+            }
+
         }
         //----------------------------------------------------------------------------
-        static void updateV()
+        static void updateV(int divergence_flag)
         {
             double[,] A = new double[K, J];
             double[,] B = new double[K, J];
-
-            for (int i = 0; i < I; i++)
-                for (int j = 0; j < J; j++)
-                    if (Xhat[i, j] != 0)
-                        XdiviXhat[i, j] = X[i, j] / Xhat[i, j];
-
-            for (int ff = 0; ff < fai; ff++)
+            //Euclid
+            if (divergence_flag == 0)
             {
-                A.Clear();
-                B.Clear();
-                for (int tt = 0; tt < tau; tt++)
+                for (int ff = 0; ff < fai; ff++)
                 {
-                    A = Mt.Add(A, Mt.Mul(shift_down(T[tt], ff).T(), shift_left(XdiviXhat, tt)));
-                    B = Mt.Add(B, Mt.Mul(shift_down(T[tt], ff).T(), ones));
-                }
-                for (int k = 0; k < K; k++)
-                    for (int j = 0; j < J; j++)
+                    A.Clear();
+                    B.Clear();
+                    for (int tt = 0; tt < tau; tt++)
                     {
-                        if (A[k, j] == 0 && B[k, j] == 0)
-                            V[ff][k, j] = V[ff][k, j];
-                        else if (B[k, j] != 0)
-                            V[ff][k, j] = V[ff][k, j] * A[k, j] / B[k, j];
+                        A = Mt.Add(A, Mt.Mul(shift_down(T[tt], ff).T(), shift_left(X, tt)));
+                        B = Mt.Add(B, Mt.Mul(shift_down(T[tt], ff).T(), shift_left(Xhat, tt)));
                     }
+                    for (int k = 0; k < K; k++)
+                        for (int j = 0; j < J; j++)
+                        {
+                            if (A[k, j] == 0 && B[k, j] == 0)
+                                V[ff][k, j] = V[ff][k, j];
+                            else if (B[k, j] != 0)
+                                V[ff][k, j] = V[ff][k, j] * A[k, j] / B[k, j];
+                        }
+                }
 
+            }
+
+            //KL
+            else if (divergence_flag == 1)
+            {
+                for (int i = 0; i < I; i++)
+                    for (int j = 0; j < J; j++)
+                        if (Xhat[i, j] != 0)
+                            XdiviXhat[i, j] = X[i, j] / Xhat[i, j];
+
+                for (int ff = 0; ff < fai; ff++)
+                {
+                    A.Clear();
+                    B.Clear();
+                    for (int tt = 0; tt < tau; tt++)
+                    {
+                        A = Mt.Add(A, Mt.Mul(shift_down(T[tt], ff).T(), shift_left(XdiviXhat, tt)));
+                        B = Mt.Add(B, Mt.Mul(shift_down(T[tt], ff).T(), ones));
+                    }
+                    for (int k = 0; k < K; k++)
+                        for (int j = 0; j < J; j++)
+                        {
+                            if (A[k, j] == 0 && B[k, j] == 0)
+                                V[ff][k, j] = V[ff][k, j];
+                            else if (B[k, j] != 0)
+                                V[ff][k, j] = V[ff][k, j] * A[k, j] / B[k, j];
+                        }
+                }
             }
         }
         //--------------------------------------------------------------------------------------------------
@@ -157,6 +226,22 @@ namespace NMF2D
             Xhat = Sum;
         }
         //--------------------------------------------------------------------------------------------------
+        static double[,] reproduct(int K)
+        {
+            double[,] A;
+            double[,] rep = new double[I, J];
+            for (int tt = 0; tt < tau; tt++)
+            {
+                for (int ff = 0; ff < fai; ff++)
+                {
+                    A = Mt.Mul(shift_down(getcolomn(T[tt], K), ff), shift_right(getrow(V[ff], K), tt));
+                    rep = Mt.Add(rep, A);
+                }
+            }
+            return rep;
+        }
+        //--------------------------------------------------------------------------------------------------
+
 
         #region パーツ
         //--------------------------------------------------------------------------------------------------
@@ -238,6 +323,22 @@ namespace NMF2D
             }
             else Console.WriteLine("shift spot error");
             return matrix;
+        }
+        //----------------------------------------------------------------------------------------
+        static double[,] getcolomn(double[,] m, int colomn_num)
+        {
+            double[,] output = new double[m.GetLength(0), 1];
+            for (int i = 0; i < m.GetLength(0); i++)
+                output[i, 0] = m[i, colomn_num];
+            return output;
+        }
+        //----------------------------------------------------------------------------------------
+        static double[,] getrow(double[,] m, int row_num)
+        {
+            double[,] output = new double[1, m.GetLength(1)];
+            for (int i = 0; i < m.GetLength(1); i++)
+                output[0, i] = m[row_num, i];
+            return output;
         }
         //----------------------------------------------------------------------------------------
         static double errorcalc(double[,] truth, double[,] estimate)
