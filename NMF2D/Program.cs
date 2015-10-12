@@ -36,7 +36,7 @@ namespace NMF2D
 
             init(shift_flag);
             int itteration = 0;
-            while (itteration < 9)
+            while (itteration < 100)
             {
                 itteration++;
                 Updates(divergence_flag);
@@ -44,7 +44,8 @@ namespace NMF2D
 
             }
             //CsvFileIO.CsvFileIO.WriteData("out_K.csv", T[0]);
-            CsvFileIO.CsvFileIO.WriteData("reproducted.csv", reproduct(0));
+            for (int k = 0; k < K; k++)
+                CsvFileIO.CsvFileIO.WriteData("reproducted(K=)"+k+".csv", reproduct(k));
         }
         //----------------------------------------------------------------------------
         static void init(int shift_flag)
