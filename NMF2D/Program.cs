@@ -35,29 +35,37 @@ namespace NMF2D
             int shift_flag = 0;                // 0:only f shift  1:f and time shift
 
             init(shift_flag);
+            double error = 0;
+            int max_itteration = 100;
             int itteration = 0;
-            while (itteration < 100)
+            double[,] errormat = new double[max_itteration, 1];
+
+            updateXhat();
+            while (itteration < max_itteration)
             {
+                error = errorcalc(X, Xhat);
+                errormat[itteration,0] = error;
                 itteration++;
                 Updates(divergence_flag);
-                Console.WriteLine("itteration : " + itteration + " error = " + errorcalc(X, Xhat));
+                Console.WriteLine("itteration : " + itteration + " error = " + error);
 
             }
             //CsvFileIO.CsvFileIO.WriteData("out_K.csv", T[0]);
             for (int k = 0; k < K; k++)
-                CsvFileIO.CsvFileIO.WriteData("reproducted(K=)"+k+".csv", reproduct(k));
+                CsvFileIO.CsvFileIO.WriteData("reproducted(K=)" + k + ".csv", reproduct(k));
+            CsvFileIO.CsvFileIO.WriteData("error.csv", errormat);
         }
         //----------------------------------------------------------------------------
         static void init(int shift_flag)
         {
-            string input_filename = @"C:\Users\優\Desktop\音素材\cq.csv";
+            string input_filename = @"C:\Users\優\Desktop\音素材\cq(mix4).csv";
             X = CsvFileIO.CsvFileIO.ReadData(input_filename);
 
             I = X.GetLength(0);
             J = X.GetLength(1);
-            K = 3;
+            K = 4;
             tau = 7;
-            fai = 12;
+            fai = 40;
 
             XdiviXhat = new double[I, J];
 
@@ -91,10 +99,10 @@ namespace NMF2D
         //----------------------------------------------------------------------------
         static void Updates(int divergence_flag)
         {
-            updateXhat();
             updateT(divergence_flag);
             updateXhat();
             updateV(divergence_flag);
+            updateXhat();
         }
 
         //----------------------------------------------------------------------------
