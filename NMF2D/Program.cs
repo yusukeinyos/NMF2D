@@ -58,14 +58,14 @@ namespace NMF2D
         //----------------------------------------------------------------------------
         static void init(int shift_flag)
         {
-            string input_filename = @"C:\Users\優\Desktop\音素材\cq(mix4).csv";
+            string input_filename = @"C:\Users\優\Desktop\音素材\cq(mix3v3).csv";
             X = CsvFileIO.CsvFileIO.ReadData(input_filename);
 
             I = X.GetLength(0);
             J = X.GetLength(1);
             K = 4;
             tau = 7;
-            fai = 40;
+            fai = 24; //36がbetter
 
             XdiviXhat = new double[I, J];
 
