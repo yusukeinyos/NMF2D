@@ -33,39 +33,45 @@ namespace NMF2D
         {
             int divergence_flag = 0;           // 0:Euclid Norm  1:KL 
             int shift_flag = 0;                // 0:only f shift  1:f and time shift
+            int fixed_flag = 1;                // 0:not fixed T   1:fixed T
 
-            init(shift_flag);
+            init(shift_flag, fixed_flag);
             double error = 0;
             int max_itteration = 100;
             int itteration = 0;
             double[,] errormat = new double[max_itteration, 1];
 
             updateXhat();
-            while (itteration < max_itteration)
+            while (itteration < max_itteration - 70)
             {
                 error = errorcalc(X, Xhat);
-                errormat[itteration,0] = error;
+                errormat[itteration, 0] = error;
                 itteration++;
-                Updates(divergence_flag);
+                Updates(divergence_flag, fixed_flag);
                 Console.WriteLine("itteration : " + itteration + " error = " + error);
 
             }
             //CsvFileIO.CsvFileIO.WriteData("out_K.csv", T[0]);
             for (int k = 0; k < K; k++)
                 CsvFileIO.CsvFileIO.WriteData("reproducted(K=)" + k + ".csv", reproduct(k));
+            int[] index = { 10, 10, 10, 10 };
+            reproduct_by_instrument(index);
             CsvFileIO.CsvFileIO.WriteData("error.csv", errormat);
         }
         //----------------------------------------------------------------------------
-        static void init(int shift_flag)
+        static void init(int shift_flag, int fixed_flag)
         {
-            string input_filename = @"C:\Users\優\Desktop\音素材\cq(mix3v3).csv";
+            string input_filename = @"C:\Users\優\Desktop\音素材\cq(mix4).csv";
+            string fixed_T_filename = @"C:\Users\優\Desktop\音素材\GaPNMF\Base_mix4.csv";
             X = CsvFileIO.CsvFileIO.ReadData(input_filename);
 
             I = X.GetLength(0);
             J = X.GetLength(1);
-            K = 4;
+            if (fixed_flag == 0)
+                K = 4;
+
             tau = 7;
-            fai = 24; //36がbetter
+            fai = 36; //36がbetter
 
             XdiviXhat = new double[I, J];
 
@@ -75,7 +81,13 @@ namespace NMF2D
                 // only f shift
                 case 0:
                     tau = 1;
-                    T.Add(initMatrix(I, K));
+                    if (fixed_flag == 0)
+                        T.Add(initMatrix(I, K));
+                    else
+                    {
+                        T.Add(CsvFileIO.CsvFileIO.ReadData(fixed_T_filename));
+                        K = T[0].GetLength(1);
+                    }
                     break;
                 // f and time shift
                 case 1:
@@ -97,10 +109,13 @@ namespace NMF2D
 
         }
         //----------------------------------------------------------------------------
-        static void Updates(int divergence_flag)
+        static void Updates(int divergence_flag, int fixed_flag)
         {
-            updateT(divergence_flag);
-            updateXhat();
+            if (fixed_flag == 0)
+            {
+                updateT(divergence_flag);
+                updateXhat();
+            }
             updateV(divergence_flag);
             updateXhat();
         }
@@ -248,6 +263,33 @@ namespace NMF2D
                 }
             }
             return rep;
+        }
+        //--------------------------------------------------------------------------------------------------
+        static void reproduct_by_instrument(int[] index)
+        {
+            double[,] A;
+            double[,] rep = new double[I, J];
+            double[,] sum = new double[I, J];
+            int start = 0;
+            for (int c = 0; c < index.Length; c++)
+            {
+                sum.Clear();
+                for (int d = start; d < start + index[c]; d++)
+                {
+                    rep.Clear();
+                    for (int tt = 0; tt < tau; tt++)
+                    {
+                        for (int ff = 0; ff < fai; ff++)
+                        {
+                            A = Mt.Mul(shift_down(getcolomn(T[tt], d), ff), shift_right(getrow(V[ff], d), tt));
+                            rep = Mt.Add(rep, A);
+                        }
+                    }
+                    sum = Mt.Add(sum, rep);
+                }
+                CsvFileIO.CsvFileIO.WriteData("reproducted(K=)" + c + ".csv", sum);
+                start += index[c];
+            }
         }
         //--------------------------------------------------------------------------------------------------
 
