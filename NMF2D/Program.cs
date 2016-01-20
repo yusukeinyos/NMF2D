@@ -26,6 +26,7 @@ namespace NMF2D
         static int K;   //基底数
         static int I;
         static int J;
+        static int baseNumForNoise;
 
         static double min;
 
@@ -34,15 +35,16 @@ namespace NMF2D
             int divergence_flag = 0;           // 0:Euclid Norm  1:KL 
             int shift_flag = 0;                // 0:only f shift  1:f and time shift
             int fixed_flag = 1;                // 0:not fixed T   1:fixed T
+            baseNumForNoise = 20;
 
-            init(shift_flag, fixed_flag);
+            init(shift_flag, fixed_flag,baseNumForNoise);
             double error = 0;
             int max_itteration = 100;
             int itteration = 0;
             double[,] errormat = new double[max_itteration, 1];
 
             updateXhat();
-            while (itteration < max_itteration - 70)
+            while (itteration < max_itteration-50 )
             {
                 error = errorcalc(X, Xhat);
                 errormat[itteration, 0] = error;
@@ -52,17 +54,20 @@ namespace NMF2D
 
             }
             //CsvFileIO.CsvFileIO.WriteData("out_K.csv", T[0]);
-            for (int k = 0; k < K; k++)
-                CsvFileIO.CsvFileIO.WriteData("reproducted(K=)" + k + ".csv", reproduct(k));
-            int[] index = { 10, 10, 10, 10 };
+            //for (int k = 0; k < K; k++)
+            //    CsvFileIO.CsvFileIO.WriteData("reproducted(K=)" + k + ".csv", reproduct(k));
+            int[] index = { 11, 12, 11, 10, 20 };
+            //int[] index = { 12,10 }; //piano分とnoiseを別ファイルに取り出し
             reproduct_by_instrument(index);
             CsvFileIO.CsvFileIO.WriteData("error.csv", errormat);
         }
         //----------------------------------------------------------------------------
-        static void init(int shift_flag, int fixed_flag)
+        static void init(int shift_flag, int fixed_flag, int baseNumForNoise)
         {
+            //string input_filename = @"C:\Users\優\Desktop\音素材\GaPNMF\君の知らない_cq.csv";
             string input_filename = @"C:\Users\優\Desktop\音素材\cq(mix4).csv";
             string fixed_T_filename = @"C:\Users\優\Desktop\音素材\GaPNMF\Base_mix4.csv";
+            //string fixed_T_filename = @"C:\Users\優\Desktop\音素材\GaPNMF\piano_c4_cq_w.csv";
             X = CsvFileIO.CsvFileIO.ReadData(input_filename);
 
             I = X.GetLength(0);
@@ -71,7 +76,7 @@ namespace NMF2D
                 K = 4;
 
             tau = 7;
-            fai = 36; //36がbetter
+            fai = 48; //36がbetter
 
             XdiviXhat = new double[I, J];
 
@@ -85,7 +90,9 @@ namespace NMF2D
                         T.Add(initMatrix(I, K));
                     else
                     {
-                        T.Add(CsvFileIO.CsvFileIO.ReadData(fixed_T_filename));
+                        double[,] baseMat=CsvFileIO.CsvFileIO.ReadData(fixed_T_filename);
+                        RandomMT rand = new RandomMT();
+                        T.Add(New.Array(I, baseMat.GetLength(1) + baseNumForNoise, (i, j) => { if (j < baseMat.GetLength(1)) return baseMat[i, j]; else {  return 10 * rand.Double32OC(); } }));
                         K = T[0].GetLength(1);
                     }
                     break;
@@ -113,7 +120,12 @@ namespace NMF2D
         {
             if (fixed_flag == 0)
             {
-                updateT(divergence_flag);
+                updateT(divergence_flag , 0); //要素0からK-1まで更新
+                updateXhat();
+            }
+            else if (fixed_flag == 1 && baseNumForNoise > 0)
+            {
+                updateT(divergence_flag, K - baseNumForNoise); //要素K - baseNumForNoiseからK-1までbaseNumForNoise個分のみ更新
                 updateXhat();
             }
             updateV(divergence_flag);
@@ -121,7 +133,7 @@ namespace NMF2D
         }
 
         //----------------------------------------------------------------------------
-        static void updateT(int divergence_flag)
+        static void updateT(int divergence_flag,int startPointForNoise)
         {
             double[,] A = new double[I, K];
             double[,] B = new double[I, K];
@@ -139,7 +151,7 @@ namespace NMF2D
                         B = Mt.Add(B, Mt.Mul(shift_up(Xhat, ff), shift_right(V[ff], tt).T()));
                     }
                     for (int i = 0; i < I; i++)
-                        for (int k = 0; k < K; k++)
+                        for (int k = 0 + startPointForNoise; k < K; k++)
                         {
                             if (A[i, k] == 0 && B[i, k] == 0)
                                 T[tt][i, k] = T[tt][i, k];
@@ -166,7 +178,7 @@ namespace NMF2D
                         B = Mt.Add(B, Mt.Mul(ones, shift_right(V[ff], tt).T()));
                     }
                     for (int i = 0; i < I; i++)
-                        for (int k = 0; k < K; k++)
+                        for (int k = 0 + startPointForNoise; k < K; k++)
                         {
                             if (A[i, k] == 0 && B[i, k] == 0)
                                 T[tt][i, k] = T[tt][i, k];
@@ -287,7 +299,7 @@ namespace NMF2D
                     }
                     sum = Mt.Add(sum, rep);
                 }
-                CsvFileIO.CsvFileIO.WriteData("reproducted(K=)" + c + ".csv", sum);
+                CsvFileIO.CsvFileIO.WriteData("reproducted(K=" + c + ").csv", sum);
                 start += index[c];
             }
         }
